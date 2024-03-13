@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.UIElements;
 
 public class PlayerController : MonoBehaviour
 {
@@ -9,9 +10,20 @@ public class PlayerController : MonoBehaviour
     private Vector2 moveInput;
     private Vector2 currentMoveInput;
     private Vector2 moveInputVelocity;
+    private Vector2 moveInputLastFrame;
     private float moveInputSmoothTime = .1f;
     [SerializeField] private float moveSpeed;
 
+    // Inventory
+    private InventoryManager inventoryManager;
+    private bool openInventoryPressed;
+
+    // Interaction
+    private ItemSO equippedItem;
+    private FarmTile lastHitTile;
+    private RaycastHit2D lastHit;
+    private bool interactPressed;
+    public bool shouldPerformRaycast;
 
     // Mood
     private Vector2 increaseMoodInput;
@@ -22,27 +34,73 @@ public class PlayerController : MonoBehaviour
     // Start is called before the first frame update
     void Start()
     {
-
+        inventoryManager = InventoryManager.Instance;
     }
 
     // Update is called once per frame
     void Update()
     {
         HandleMoveInput();
+        HandleInteraction();
     }
 
     private void HandleMoveInput()
     {
         // Smooth move input values
-
         currentMoveInput = Vector2.SmoothDamp(currentMoveInput, moveInput, ref moveInputVelocity, moveInputSmoothTime);
+        
         // Apply movement
         transform.Translate(currentMoveInput * moveSpeed * Time.deltaTime);
     }
 
-    private void OnMove(InputValue value)
+    private void HandleInteraction()
     {
-        moveInput = value.Get<Vector2>();
+        if (shouldPerformRaycast)
+        {
+            // Cast a ray from the current position (transform) in the currentMoveInput direction
+            RaycastHit2D hit = Physics2D.Raycast(transform.position, currentMoveInput.normalized);
+            
+
+            if (hit.collider)
+            {
+                FarmTile raycastTile = hit.collider.GetComponent<FarmTile>();
+                lastHitTile = raycastTile;
+
+                if (interactPressed)
+                {
+                    // Handle interaction with the object hit by the ray
+                    lastHitTile.FillWater();
+
+                    Debug.Log("Interacted with: " + hit.collider.gameObject.name);
+                }
+
+                // Store lastHit for next frame
+                lastHit = hit;
+            }
+            else
+            {
+                // There's no new hit
+                if (interactPressed)
+                {
+                    // Handle interaction with the object hit by the ray
+                    lastHitTile.FillWater();
+
+                    Debug.Log("Interacted with: " + hit.collider.gameObject.name);
+                }
+            }
+
+            Debug.DrawRay(transform.position, currentMoveInput, Color.red);
+        }
+    }
+
+    private ItemSO GetEquippedItem()
+    {
+        return inventoryManager.GetSelectedItemData();
+    }
+
+    public void OnMove(InputAction.CallbackContext context)
+    {
+        moveInput = context.ReadValue<Vector2>();
 
         float minInputMagnitude = 0.5f;
 
@@ -68,9 +126,26 @@ public class PlayerController : MonoBehaviour
         }
     }
 
-    private void OnIncreaseMood(InputValue value)
+    public void OnInteract(InputAction.CallbackContext context)
     {
-        increaseMoodInput = value.Get<Vector2>();
+        interactPressed = !context.canceled;
+        StartCoroutine(ResetInteractStart());
+    }
+
+    private IEnumerator ResetInteractStart()
+    {
+        yield return new WaitForEndOfFrame();
+        interactPressed = false;
+    }
+
+    public void OnOpenInventory(InputAction.CallbackContext context)
+    {
+        openInventoryPressed = context.ReadValueAsButton();
+    }
+
+    public void OnIncreaseMood(InputAction.CallbackContext context)
+    {
+        increaseMoodInput = context.ReadValue<Vector2>();
         moodLevel += increaseMoodInput.y;
 
         if (moodLevel >= 100f)

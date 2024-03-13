@@ -16,10 +16,37 @@ public class Item : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHand
 
     public void InitializeItem(ItemSO newItemData)
     {
-        itemData = newItemData;     
-        image.sprite = newItemData.sprite;
+        itemData = newItemData;
 
+        UpdateItemSprite(itemData);
         RefreshItemAmount();
+    }
+
+    private void UpdateItemSprite(ItemSO itemData)
+    {
+        switch(itemData.itemType)
+        {
+            case ItemType.Tool:
+                image.sprite = itemData.toolSprite;
+                break;
+
+            case ItemType.Crop:
+                switch (itemData.cropStage)
+                {
+                    case CropGrowthStage.Seedling:
+                        image.sprite = itemData.seedlingCropSprite;
+                        break;
+
+                    case CropGrowthStage.Mature:
+                        image.sprite = itemData.matureCropSprite;
+                        break;
+
+                    case CropGrowthStage.Harvestable:
+                        image.sprite = itemData.harvestableCropSprite;
+                        break;
+                }
+                break;
+        }
     }
 
     public void RefreshItemAmount()
